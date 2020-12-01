@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 const TARGET: usize = 2020;
 
 pub fn solve() {
@@ -8,12 +10,22 @@ pub fn solve() {
         .filter_map(|v| v.ok())
         .collect::<Vec<_>>();
 
+    let mut triple = HashMap::new();
+
     let (higher, lower): (Vec<usize>, Vec<usize>) =
         numbers.iter().partition(|&v| v >= &(TARGET / 2));
 
-    let result = higher.iter().find(|&v| lower.contains(&(TARGET - v)));
+    for high in &higher {
+        for low in &lower {
+            triple.insert((high, low), high + low);
+        }
+    }
 
-    if let Some(found) = result {
-        println!("Solution: {:?}", found * (TARGET - found));
+    let result = triple
+        .iter()
+        .find(|(_, &v)| v < TARGET && lower.contains(&(&TARGET - v)));
+
+    if let Some(((&k1, &k2), v)) = result {
+        println!("Solution: {:?}", k1 * k2 * (TARGET - v));
     }
 }
