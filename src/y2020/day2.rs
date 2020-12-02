@@ -9,7 +9,8 @@ use nom::{
 
 #[derive(Debug, PartialEq)]
 struct Requirement {
-    occurrences: std::ops::Range<usize>,
+    first_position: usize,
+    second_position: usize,
     character: char,
 }
 
@@ -18,21 +19,28 @@ struct Password<'a>(&'a str);
 
 impl<'a> Password<'a> {
     fn meets_requirement(&self, requirement: &Requirement) -> bool {
-        requirement
-            .occurrences
-            .contains(&self.0.matches(requirement.character).count())
+        let chars = self.0.chars().collect::<Vec<char>>();
+        let first_value = chars[requirement.first_position - 1];
+        let second_value = chars[requirement.second_position - 1];
+
+        [first_value, second_value]
+            .iter()
+            .filter(|&v| v == &requirement.character)
+            .count()
+            == 1
     }
 }
 
 fn parse_requirement(input: &str) -> IResult<&str, Requirement> {
-    let (input, (start, end)) = separated_pair(parse_usize, tag("-"), parse_usize)(input)?;
+    let (input, (first_position, second_position)) =
+        separated_pair(parse_usize, tag("-"), parse_usize)(input)?;
     let (input, character) = terminated(preceded(tag(" "), single_char), tag(":"))(input)?;
-    let occurrences = start..end + 1;
 
     Ok((
         input,
         Requirement {
-            occurrences,
+            first_position,
+            second_position,
             character,
         },
     ))
