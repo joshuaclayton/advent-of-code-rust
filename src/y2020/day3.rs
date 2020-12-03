@@ -24,24 +24,25 @@ fn parse_line(input: &str) -> IResult<&str, Vec<Tile>> {
 
 type Coordinates = (usize, usize);
 
-fn step((x, y): Coordinates) -> Coordinates {
-    (x + 3, y + 1)
+fn step((plus_x, plus_y): (usize, usize)) -> Box<dyn Fn(Coordinates) -> Coordinates> {
+    Box::new(move |(x, y)| (x + plus_x, y + plus_y))
 }
 
 pub fn solve() {
     let input = include_str!("input-day3");
     let (_, all) = separated_list1(tag("\n"), parse_line)(&input).unwrap();
-    let mut start = (0, 0);
-    let mut tiles = vec![];
     let width = all[0].len();
+    let mut counts = vec![];
 
-    while start.1 < all.len() - 1 {
-        start = step(start);
-        tiles.push(&all[start.1][start.0.rem_euclid(width)]);
+    for modifier in [(1, 1), (3, 1), (5, 1), (7, 1), (1, 2)].iter() {
+        let mut tiles = vec![];
+        let mut start = (0, 0);
+        while start.1 < all.len() - 1 {
+            start = step(*modifier)(start);
+            tiles.push(&all[start.1][start.0.rem_euclid(width)]);
+        }
+        counts.push(tiles.iter().filter(|v| v == &&&Tile::Tree).count());
     }
 
-    println!(
-        "Solution: {:?}",
-        tiles.iter().filter(|v| v == &&&Tile::Tree).count()
-    );
+    println!("Solution: {:?}", counts.iter().fold(1, |acc, v| acc * v));
 }
