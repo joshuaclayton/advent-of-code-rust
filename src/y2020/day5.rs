@@ -5,6 +5,7 @@ use nom::{
     multi::{many1, separated_list1},
     IResult,
 };
+use std::collections::HashMap;
 
 #[derive(PartialEq)]
 enum FB {
@@ -55,6 +56,7 @@ fn lr_set(position: usize) -> u8 {
     }
 }
 
+#[derive(Debug)]
 struct Seat {
     row: usize,
     column: usize,
@@ -88,13 +90,42 @@ impl From<(Vec<FB>, Vec<LR>)> for Seat {
     }
 }
 
+fn gap(mut input: Vec<usize>) -> Option<usize> {
+    let mut missing: Option<usize> = None;
+    input.sort();
+    let mut last = input.remove(0);
+
+    for v in input {
+        if v == last + 1 {
+        } else {
+            missing = Some(v - 1)
+        }
+
+        last = v
+    }
+    missing
+}
+
 pub fn solve() {
     let input = include_str!("input-day5");
-    let (_, seats) = separated_list1(tag("\n"), parse_seat)(&input).unwrap();
+    let (_, mut seats) = separated_list1(tag("\n"), parse_seat)(&input).unwrap();
+    let mut rowed_seats: HashMap<usize, Vec<Seat>> = HashMap::new();
+    let min_row: usize = seats.iter().min_by_key(|v| v.row).unwrap().row;
+    let max_row: usize = seats.iter().max_by_key(|v| v.row).unwrap().row;
+
+    for row in min_row..=max_row {
+        rowed_seats.insert(
+            row,
+            seats.drain_filter(|s| s.row == row).collect::<Vec<_>>(),
+        );
+    }
 
     println!(
         "Solution: {:?}",
-        seats.iter().max_by_key(|v| v.seat_id()).unwrap().seat_id()
+        rowed_seats
+            .values()
+            .filter_map(|v| gap(v.iter().map(|x| x.seat_id()).collect::<Vec<_>>()))
+            .collect::<Vec<_>>()
     );
 }
 
@@ -108,5 +139,12 @@ mod tests {
         assert_eq!(seat.row, 70);
         assert_eq!(seat.column, 7);
         assert_eq!(seat.seat_id(), 567);
+    }
+
+    #[test]
+    fn gap_works() {
+        assert_eq!(gap(vec![1, 2, 3, 4]), None);
+        assert_eq!(gap(vec![1, 2, 3, 5]), Some(4));
+        assert_eq!(gap(vec![2, 3]), None);
     }
 }
