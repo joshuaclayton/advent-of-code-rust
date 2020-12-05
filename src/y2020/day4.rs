@@ -1,175 +1,226 @@
+use crate::parser::*;
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_till},
+    bytes::complete::tag,
+    bytes::complete::{take_till, take_while_m_n},
+    combinator::{map, map_res},
     multi::separated_list1,
-    sequence::preceded,
+    sequence::{preceded, terminated},
     IResult,
 };
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::convert::TryInto;
 
-#[derive(Debug, PartialEq)]
-struct RequiredCredentials {
-    birth_year: String,
-    issue_year: String,
-    expiration_year: String,
-    height: String,
-    hair_color: String,
-    eye_color: String,
-    passport_id: String,
+#[derive(Debug)]
+enum BirthYear<'a> {
+    Valid(usize),
+    Invalid(&'a str),
 }
 
-#[derive(Debug, PartialEq)]
-enum Credentials {
-    NorthPoleCredentials {
-        creds: RequiredCredentials,
-    },
-    Passport {
-        creds: RequiredCredentials,
-        country_id: String,
-    },
+#[derive(Debug)]
+enum IssueYear<'a> {
+    Valid(usize),
+    Invalid(&'a str),
 }
 
-fn parse_field<'a>(
-    name: &'static str,
-) -> Box<dyn Fn(&'a str) -> IResult<&'a str, (&'a str, &'a str)>> {
-    Box::new(move |input| {
-        let to_break = take_till(|c| c == ' ' || c == '\n');
-        let (input, val) = preceded(tag(name), preceded(tag(":"), to_break))(input)?;
-        Ok((input, (name, val)))
-    })
+#[derive(Debug)]
+enum ExpirationYear<'a> {
+    Valid(usize),
+    Invalid(&'a str),
 }
 
-fn parse_passport<'a>(input: &'a str) -> IResult<&str, HashMap<&'a str, &'a str>> {
-    let key_value_pair = alt((
-        parse_field("byr"),
-        parse_field("iyr"),
-        parse_field("eyr"),
-        parse_field("hgt"),
-        parse_field("hcl"),
-        parse_field("ecl"),
-        parse_field("pid"),
-        parse_field("cid"),
-    ));
-    let (input, pairs) = separated_list1(alt((tag(" "), tag("\n"))), key_value_pair)(input)?;
-
-    Ok((input, pairs.into_iter().collect::<HashMap<_, _>>()))
+#[derive(Debug)]
+enum Height<'a> {
+    Cm(usize),
+    In(usize),
+    Invalid(&'a str),
 }
 
-#[derive(Debug, PartialEq)]
-enum InvalidBaseCredentials {
-    MissingBirthYear,
-    MissingIssueYear,
-    MissingExpirationYear,
-    MissingHeight,
-    MissingHairColor,
-    MissingEyeColor,
-    MissingPassportId,
+#[derive(Debug)]
+enum HairColor<'a> {
+    Valid(&'a str),
+    Invalid(&'a str),
 }
 
-impl TryFrom<&HashMap<&str, &str>> for Credentials {
-    type Error = Vec<InvalidBaseCredentials>;
+#[derive(Debug)]
+enum EyeColor {
+    Amber,
+    Blue,
+    Brown,
+    Gray,
+    Green,
+    Hazel,
+    Other,
+    Invalid,
+}
 
-    fn try_from(value: &HashMap<&str, &str>) -> Result<Self, Self::Error> {
-        let possible_country_id = value.get("cid");
-        let creds: RequiredCredentials = value.try_into()?;
+#[derive(Debug)]
+enum PassportId<'a> {
+    Valid(&'a str),
+    Invalid(&'a str),
+}
 
-        if let Some(country_id) = possible_country_id {
-            Ok(Credentials::Passport {
-                creds,
-                country_id: country_id.to_string(),
-            })
-        } else {
-            Ok(Credentials::NorthPoleCredentials { creds })
+#[derive(Debug)]
+enum CredentialAttribute<'a> {
+    BirthYear(BirthYear<'a>),
+    IssueYear(IssueYear<'a>),
+    ExpirationYear(ExpirationYear<'a>),
+    Height(Height<'a>),
+    HairColor(HairColor<'a>),
+    EyeColor(EyeColor),
+    PassportId(PassportId<'a>),
+    CountryId(&'a str),
+}
+
+impl<'a> CredentialAttribute<'a> {
+    fn is_valid(&self) -> bool {
+        match self {
+            CredentialAttribute::BirthYear(BirthYear::Invalid(_)) => false,
+            CredentialAttribute::IssueYear(IssueYear::Invalid(_)) => false,
+            CredentialAttribute::ExpirationYear(ExpirationYear::Invalid(_)) => false,
+            CredentialAttribute::Height(Height::Invalid(_)) => false,
+            CredentialAttribute::HairColor(HairColor::Invalid(_)) => false,
+            CredentialAttribute::EyeColor(EyeColor::Invalid) => false,
+            CredentialAttribute::PassportId(PassportId::Invalid(_)) => false,
+            _ => true,
         }
     }
 }
 
-impl TryFrom<&HashMap<&str, &str>> for RequiredCredentials {
-    type Error = Vec<InvalidBaseCredentials>;
+#[derive(Debug)]
+struct CredentialAttributes<'a>(Vec<CredentialAttribute<'a>>);
 
-    fn try_from(value: &HashMap<&str, &str>) -> Result<Self, Self::Error> {
-        let mut errors = vec![];
-
-        if let None = value.get("byr") {
-            errors.push(InvalidBaseCredentials::MissingBirthYear)
-        }
-
-        if let None = value.get("iyr") {
-            errors.push(InvalidBaseCredentials::MissingIssueYear)
-        }
-
-        if let None = value.get("eyr") {
-            errors.push(InvalidBaseCredentials::MissingExpirationYear)
-        }
-
-        if let None = value.get("hgt") {
-            errors.push(InvalidBaseCredentials::MissingHeight)
-        }
-
-        if let None = value.get("hcl") {
-            errors.push(InvalidBaseCredentials::MissingHairColor)
-        }
-
-        if let None = value.get("ecl") {
-            errors.push(InvalidBaseCredentials::MissingEyeColor)
-        }
-
-        if let None = value.get("pid") {
-            errors.push(InvalidBaseCredentials::MissingPassportId)
-        }
-
-        if errors.is_empty() {
-            Ok(Self {
-                birth_year: value.get("byr").unwrap().to_string(),
-                issue_year: value.get("iyr").unwrap().to_string(),
-                expiration_year: value.get("eyr").unwrap().to_string(),
-                height: value.get("hgt").unwrap().to_string(),
-                hair_color: value.get("hcl").unwrap().to_string(),
-                eye_color: value.get("ecl").unwrap().to_string(),
-                passport_id: value.get("pid").unwrap().to_string(),
+impl<'a> CredentialAttributes<'a> {
+    fn is_valid(&self) -> bool {
+        self.0
+            .iter()
+            .filter(|v| match v {
+                CredentialAttribute::CountryId(_) => false,
+                _ => v.is_valid(),
             })
-        } else {
-            Err(errors)
-        }
+            .count()
+            == 7
     }
+}
+
+fn parse_birth_year(input: &str) -> IResult<&str, BirthYear> {
+    let (input, _) = tag("byr:")(input)?;
+
+    alt((
+        map(parse_usize_in_range(1920..=2002), BirthYear::Valid),
+        map(to_end_of_tag, BirthYear::Invalid),
+    ))(input)
+}
+
+fn parse_issue_year(input: &str) -> IResult<&str, IssueYear> {
+    let (input, _) = tag("iyr:")(input)?;
+
+    alt((
+        map(parse_usize_in_range(2010..=2020), IssueYear::Valid),
+        map(to_end_of_tag, IssueYear::Invalid),
+    ))(input)
+}
+
+fn parse_expiration_year(input: &str) -> IResult<&str, ExpirationYear> {
+    let (input, _) = tag("eyr:")(input)?;
+
+    alt((
+        map(parse_usize_in_range(2020..=2030), ExpirationYear::Valid),
+        map(to_end_of_tag, ExpirationYear::Invalid),
+    ))(input)
+}
+
+fn parse_height(input: &str) -> IResult<&str, Height> {
+    let (input, _) = tag("hgt:")(input)?;
+
+    alt((
+        map(
+            terminated(parse_usize_in_range(59..=76), tag("in")),
+            Height::In,
+        ),
+        map(
+            terminated(parse_usize_in_range(150..=193), tag("cm")),
+            Height::Cm,
+        ),
+        map(to_end_of_tag, Height::Invalid),
+    ))(input)
+}
+
+fn parse_hair_color(input: &str) -> IResult<&str, HairColor> {
+    let (input, _) = tag("hcl:")(input)?;
+
+    alt((
+        map(
+            preceded(
+                tag("#"),
+                take_while_m_n(6, 6, |v: char| v.is_ascii_hexdigit()),
+            ),
+            HairColor::Valid,
+        ),
+        map(to_end_of_tag, HairColor::Invalid),
+    ))(input)
+}
+
+fn parse_eye_color(input: &str) -> IResult<&str, EyeColor> {
+    let (input, _) = tag("ecl:")(input)?;
+
+    alt((
+        map(tag("amb"), |_| EyeColor::Amber),
+        map(tag("blu"), |_| EyeColor::Blue),
+        map(tag("brn"), |_| EyeColor::Brown),
+        map(tag("gry"), |_| EyeColor::Gray),
+        map(tag("grn"), |_| EyeColor::Green),
+        map(tag("hzl"), |_| EyeColor::Hazel),
+        map(tag("oth"), |_| EyeColor::Other),
+        map(to_end_of_tag, |_| EyeColor::Invalid),
+    ))(input)
+}
+
+fn parse_passport_id(input: &str) -> IResult<&str, PassportId> {
+    let (input, _) = tag("pid:")(input)?;
+
+    alt((
+        map_res(to_end_of_tag, |v: &str| {
+            if v.len() == 9 && v.chars().all(|c| c.is_ascii_digit()) {
+                Ok(PassportId::Valid(v))
+            } else {
+                Err("invalid length")
+            }
+        }),
+        map(to_end_of_tag, PassportId::Invalid),
+    ))(input)
+}
+
+fn to_end_of_tag(input: &str) -> IResult<&str, &str> {
+    take_till(|c| c == ' ' || c == '\n')(input)
+}
+
+fn parse_credential_attribute<'a>(input: &'a str) -> IResult<&'a str, CredentialAttribute<'a>> {
+    alt((
+        map(parse_birth_year, CredentialAttribute::BirthYear),
+        map(parse_issue_year, CredentialAttribute::IssueYear),
+        map(parse_expiration_year, CredentialAttribute::ExpirationYear),
+        map(parse_height, CredentialAttribute::Height),
+        map(parse_hair_color, CredentialAttribute::HairColor),
+        map(parse_eye_color, CredentialAttribute::EyeColor),
+        map(parse_passport_id, CredentialAttribute::PassportId),
+        map(
+            preceded(tag("cid:"), to_end_of_tag),
+            CredentialAttribute::CountryId,
+        ),
+    ))(input)
+}
+
+fn parse_credentials<'a>(input: &'a str) -> IResult<&'a str, CredentialAttributes<'a>> {
+    let (input, credentials_attributes) =
+        separated_list1(alt((tag(" "), tag("\n"))), parse_credential_attribute)(input)?;
+
+    Ok((input, CredentialAttributes(credentials_attributes)))
 }
 
 pub fn solve() {
     let input = include_str!("input-day4");
-    let (_, all) = separated_list1(tag("\n\n"), parse_passport)(&input).unwrap();
-    let valid_credentials = all.iter().map(|creds| Credentials::try_from(creds));
+    let (_, all) = separated_list1(tag("\n\n"), parse_credentials)(&input).unwrap();
     println!(
         "Solution: {:?}",
-        valid_credentials.filter_map(|v| v.ok()).count()
+        all.iter().filter(|v| v.is_valid()).count()
     );
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parse_passport_handles_basic() {
-        let input =
-            "ecl:gry pid:860033327 eyr:2020 hcl:#fffffd\nbyr:1937 iyr:2017 cid:147 hgt:183cm";
-        let (_, result) = parse_passport(input).unwrap();
-        assert!(Credentials::try_from(&result).is_ok());
-    }
-
-    #[test]
-    fn parse_passport_reports_errors() {
-        let input = "ecl:gry pid:860033327 eyr:2020 hcl:#fffffd";
-        let (_, result) = parse_passport(input).unwrap();
-
-        assert_eq!(
-            Err(vec![
-                InvalidBaseCredentials::MissingBirthYear,
-                InvalidBaseCredentials::MissingIssueYear,
-                InvalidBaseCredentials::MissingHeight,
-            ]),
-            Credentials::try_from(&result)
-        );
-    }
 }
