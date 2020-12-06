@@ -20,7 +20,8 @@ fn parse_group(input: &str) -> IResult<&str, HashSet<char>> {
         input,
         group
             .into_iter()
-            .fold(HashSet::new(), |acc, v| acc.union(&v).cloned().collect()),
+            .fold_first(|acc, v| acc.intersection(&v).cloned().collect())
+            .unwrap_or(HashSet::new()),
     ))
 }
 
