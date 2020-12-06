@@ -1,5 +1,5 @@
 use advent_of_code::*;
 
 fn main() {
-    y2020::day5::solve();
+    y2020::day6::solve();
 }
