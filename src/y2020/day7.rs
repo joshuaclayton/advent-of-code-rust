@@ -50,16 +50,30 @@ pub fn solve() {
 
     let (_, all) = separated_list1(tag("\n"), parse_contains)(input).unwrap();
 
-    let mut result: HashMap<&str, Vec<&str>> = HashMap::new();
+    let mut result: HashMap<&str, Vec<(usize, &str)>> = HashMap::new();
 
     for contain in all {
         match contain {
             ColorRule::Empty(k) => result.insert(k, vec![]),
-            ColorRule::NonEmpty(k, vs) => result.insert(k, vs.iter().map(|x| x.1).collect()),
+            ColorRule::NonEmpty(k, vs) => result.insert(k, vs),
         };
     }
 
-    println!("Solution: {:?}", ancestors_for("shiny gold", &result).len());
+    println!("Solution: {:?}", descendants_of("shiny gold", &result));
+}
+
+fn descendants_of<'a, 'b>(
+    color: &'a str,
+    rules: &HashMap<&'b str, Vec<(usize, &'b str)>>,
+) -> usize {
+    if let Some(values) = rules.get(color) {
+        values
+            .iter()
+            .map(|(k, v)| k + k * descendants_of(v, rules))
+            .sum()
+    } else {
+        0
+    }
 }
 
 fn ancestors_for<'a, 'b>(
