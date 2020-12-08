@@ -7,7 +7,7 @@ use nom::{
     sequence::{separated_pair, terminated},
     IResult,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
 enum ColorRule<'a> {
@@ -74,35 +74,6 @@ fn descendants_of<'a, 'b>(
     } else {
         0
     }
-}
-
-fn ancestors_for<'a, 'b>(
-    color: &'a str,
-    rules: &HashMap<&'b str, Vec<&'b str>>,
-) -> HashSet<&'b str> {
-    let set = color_matches(color, rules);
-    if set.is_empty() {
-        set
-    } else {
-        let result = set.iter().fold(HashSet::new(), |acc, s| {
-            acc.union(&ancestors_for(s, rules))
-                .cloned()
-                .collect::<HashSet<&str>>()
-        });
-
-        result.union(&set).cloned().collect()
-    }
-}
-
-fn color_matches<'a, 'b>(
-    color: &'a str,
-    rules: &HashMap<&'b str, Vec<&'b str>>,
-) -> HashSet<&'b str> {
-    rules
-        .iter()
-        .filter(|(_, v)| v.contains(&color))
-        .map(|(&k, _)| k)
-        .collect::<HashSet<_>>()
 }
 
 #[cfg(test)]
