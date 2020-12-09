@@ -1,46 +1,51 @@
 use crate::parser::*;
-use itertools::*;
 use nom::{bytes::complete::tag, combinator::map, multi::separated_list1, IResult};
 
 struct Numbers {
-    window: usize,
-    position: usize,
     numbers: Vec<usize>,
 }
 
 impl Numbers {
     fn new(numbers: Vec<usize>) -> Self {
-        Self {
-            window: 25,
-            position: 0,
-            numbers,
+        Self { numbers }
+    }
+
+    fn answer(&self) -> usize {
+        let result;
+        let mut position = 0;
+        loop {
+            match exact_sum(&self.numbers[position..]) {
+                Some(ending) => {
+                    result = ending;
+                    break;
+                }
+                None => {
+                    position += 1;
+                }
+            }
         }
+
+        result
     }
 }
 
-impl Iterator for Numbers {
-    type Item = usize;
+fn exact_sum(numbers: &[usize]) -> Option<usize> {
+    let mut total = 0;
+    let mut values = vec![];
+    let mut result = None;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        if check_validity(
-            &self.numbers[self.position..(self.position + self.window)],
-            self.numbers[self.position + self.window],
-        ) {
-            self.position += 1;
-            Some(self.numbers[self.position + self.window])
-        } else {
-            None
+    for num in numbers {
+        values.push(*num);
+        total += num;
+        if total == 70639851 {
+            result = Some(values.iter().min().unwrap() + values.iter().max().unwrap());
+            break;
+        } else if total > 70639851 {
+            break;
         }
     }
-}
 
-fn check_validity(numbers: &[usize], value: usize) -> bool {
-    numbers
-        .iter()
-        .combinations(2)
-        .map(|v| v[0] + v[1])
-        .collect::<Vec<_>>()
-        .contains(&value)
+    result
 }
 
 fn parse_numbers(input: &str) -> IResult<&str, Numbers> {
@@ -52,5 +57,5 @@ pub fn solve() {
 
     let (_, numbers) = parse_numbers(input).unwrap();
 
-    println!("Solution: {:?}", numbers.last());
+    println!("Solution: {:?}", numbers.answer());
 }
