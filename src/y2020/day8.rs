@@ -4,15 +4,15 @@ use nom::{
     IResult,
 };
 
-struct Computer {
+struct Computer<'a> {
     acc: isize,
-    instructions: Vec<Instruction>,
+    instructions: &'a [Instruction],
     current_position: usize,
     previous_positions: Vec<usize>,
 }
 
-impl Computer {
-    fn new(instructions: Vec<Instruction>) -> Self {
+impl<'a> Computer<'a> {
+    fn new(instructions: &'a [Instruction]) -> Self {
         Self {
             acc: 0,
             instructions,
@@ -22,16 +22,19 @@ impl Computer {
     }
 }
 
-impl Iterator for Computer {
-    type Item = isize;
+impl<'a> Iterator for Computer<'a> {
+    type Item = Result<isize, &'static str>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.previous_positions.contains(&self.current_position) {
             None
+        } else if self.current_position >= self.instructions.len() {
+            None
         } else {
+            let at_last = self.current_position + 1 == self.instructions.len();
             self.previous_positions.push(self.current_position);
             match self.instructions[self.current_position] {
-                Instruction::NoOp => {
+                Instruction::NoOp(_) => {
                     self.current_position += 1;
                 }
                 Instruction::JumpToRelative(v) => {
@@ -47,15 +50,38 @@ impl Iterator for Computer {
                 }
             }
 
-            Some(self.acc)
+            if at_last {
+                Some(Ok(self.acc))
+            } else {
+                Some(Err("not done"))
+            }
         }
     }
 }
 
+#[derive(Clone)]
 enum Instruction {
     IncrementAccumulator(isize),
     JumpToRelative(isize),
-    NoOp,
+    NoOp(isize),
+}
+
+impl Instruction {
+    fn swap(&mut self) -> &mut Self {
+        match self {
+            Instruction::IncrementAccumulator(v) => {
+                *self = Instruction::IncrementAccumulator(*v);
+            }
+            Instruction::JumpToRelative(v) => {
+                *self = Instruction::NoOp(*v);
+            }
+            Instruction::NoOp(v) => {
+                *self = Instruction::JumpToRelative(*v);
+            }
+        }
+
+        self
+    }
 }
 
 fn parse_signed_isize(input: &str) -> IResult<&str, isize> {
@@ -66,8 +92,8 @@ fn parse_signed_isize(input: &str) -> IResult<&str, isize> {
 }
 
 fn parse_nop(input: &str) -> IResult<&str, Instruction> {
-    map(preceded(tag("nop "), parse_signed_isize), |_| {
-        Instruction::NoOp
+    map(preceded(tag("nop "), parse_signed_isize), |v| {
+        Instruction::NoOp(v)
     })(input)
 }
 
@@ -91,5 +117,19 @@ pub fn solve() {
     let input = include_str!("input-day8");
     let (_, instructions) = separated_list1(tag("\n"), parse_instruction)(input).unwrap();
 
-    println!("Solution: {:?}", Computer::new(instructions).last());
+    let result = instructions
+        .iter()
+        .enumerate()
+        .filter_map(|(i, _)| {
+            let mut instructions = instructions.clone();
+            instructions[i].swap();
+
+            match Computer::new(&instructions).last() {
+                Some(Ok(v)) => Some(v),
+                _ => None,
+            }
+        })
+        .next();
+
+    println!("Solution: {:?}", result);
 }
