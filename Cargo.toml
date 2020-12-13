@@ -9,3 +9,5 @@ edition = "2018"
 [dependencies]
 nom = "6"
 itertools = "0.9"
+num-bigint = "0.3"
+num-traits = "0.2"
