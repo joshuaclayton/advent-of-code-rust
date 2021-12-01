@@ -1,4 +1,5 @@
 use crate::parser::*;
+use itertools::Itertools;
 use nom::{bytes::complete::tag, multi::separated_list1, IResult};
 
 pub fn solve() {
@@ -8,13 +9,14 @@ pub fn solve() {
 
 fn run(input: &str) -> Option<usize> {
     let (_, depths) = parse_depths(input.trim()).ok()?;
+    let triplets = depths.iter().tuple_windows::<(_, _, _)>();
     let mut last = 0;
     let mut increases = 0;
-    for v in depths {
-        if v > last {
+    for (first, second, third) in triplets {
+        if (first + second + third) > last {
             increases += 1;
         }
-        last = v;
+        last = first + second + third;
     }
 
     Some(increases - 1)
@@ -41,6 +43,6 @@ mod tests {
 260
 263
         "#;
-        assert_eq!(run(input), Some(7))
+        assert_eq!(run(input), Some(5))
     }
 }
