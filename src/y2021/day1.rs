@@ -27,8 +27,6 @@ fn parse_depths(input: &str) -> IResult<&str, Vec<usize>> {
 }
 
 mod tests {
-    use super::run;
-
     #[test]
     fn solve_returns_the_correct_value() {
         let input = r#"
@@ -43,6 +41,6 @@ mod tests {
 260
 263
         "#;
-        assert_eq!(run(input), Some(5))
+        assert_eq!(super::run(input), Some(5))
     }
 }
