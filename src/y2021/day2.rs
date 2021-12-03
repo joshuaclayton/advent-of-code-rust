@@ -10,22 +10,22 @@ enum Operation {
     Up(usize),
 }
 
-struct Position(usize, usize);
+struct Position(usize, usize, usize);
 
 impl Default for Position {
     fn default() -> Self {
-        Position(0, 0)
+        Position(0, 0, 0)
     }
 }
 
 impl Position {
     fn change_direction(&self, operation: &Operation) -> Self {
         match operation {
-            Operation::Up(v) => Position(self.0 - v, self.1),
+            Operation::Up(v) => Position(self.0, self.1, self.2 - v),
 
-            Operation::Down(v) => Position(self.0 + v, self.1),
+            Operation::Down(v) => Position(self.0, self.1, self.2 + v),
 
-            Operation::Forward(v) => Position(self.0, self.1 + v),
+            Operation::Forward(v) => Position(self.0 + self.2 * v, self.1 + v, self.2),
         }
     }
 }
@@ -79,6 +79,6 @@ down 8
 forward 2
         "#;
 
-        assert_eq!(super::run(input.trim()), Some(150));
+        assert_eq!(super::run(input.trim()), Some(900));
     }
 }
