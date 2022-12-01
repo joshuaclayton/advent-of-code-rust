@@ -1,4 +1,5 @@
 use crate::parser::*;
+use itertools::Itertools;
 use nom::{
     bytes::complete::tag,
     combinator::{all_consuming, map},
@@ -40,7 +41,13 @@ impl Elf {
 fn run(input: &str) -> Option<usize> {
     let (_, elves) = all_consuming(separated_list1(tag("\n\n"), parse_elf))(input.trim()).ok()?;
 
-    elves.iter().map(|e| e.calories_carried()).max()
+    elves
+        .iter()
+        .map(|e| e.calories_carried())
+        .sorted_by(|a, b| b.cmp(a))
+        .take(3)
+        .sum::<usize>()
+        .into()
 }
 
 fn parse_food(input: &str) -> IResult<&str, Food> {
@@ -70,6 +77,6 @@ mod tests {
 
 10000
         "#;
-        assert_eq!(super::run(input), Some(24000))
+        assert_eq!(super::run(input), Some(45000))
     }
 }
