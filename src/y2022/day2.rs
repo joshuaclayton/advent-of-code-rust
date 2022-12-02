@@ -14,13 +14,14 @@ pub fn solve() {
     println!("Answer: {:?}", run(input));
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Copy)]
 enum Shape {
     Rock,
     Paper,
     Scissors,
 }
 
+#[derive(Clone)]
 enum RoundOutcome {
     Win,
     Loss,
@@ -35,19 +36,21 @@ impl RoundOutcome {
             RoundOutcome::Win => 6,
         }
     }
+
+    fn shape_outcome(&self, opponent: &Shape) -> Shape {
+        match (self, opponent) {
+            (RoundOutcome::Win, Shape::Paper) => Shape::Scissors,
+            (RoundOutcome::Win, Shape::Rock) => Shape::Paper,
+            (RoundOutcome::Win, Shape::Scissors) => Shape::Rock,
+            (RoundOutcome::Loss, Shape::Paper) => Shape::Rock,
+            (RoundOutcome::Loss, Shape::Rock) => Shape::Scissors,
+            (RoundOutcome::Loss, Shape::Scissors) => Shape::Paper,
+            (RoundOutcome::Draw, &shape) => shape,
+        }
+    }
 }
 
 impl Shape {
-    fn round_outcome(&self, opponent: &Shape) -> RoundOutcome {
-        match (self, opponent) {
-            (a, b) if a == b => RoundOutcome::Draw,
-            (Shape::Paper, Shape::Rock) => RoundOutcome::Win,
-            (Shape::Rock, Shape::Scissors) => RoundOutcome::Win,
-            (Shape::Scissors, Shape::Paper) => RoundOutcome::Win,
-            _ => RoundOutcome::Loss,
-        }
-    }
-
     fn value(&self) -> usize {
         match self {
             Shape::Rock => 1,
@@ -57,8 +60,8 @@ impl Shape {
     }
 }
 
-fn round_score(you: &Shape, opponent: &Shape) -> usize {
-    you.round_outcome(opponent).value() + you.value()
+fn round_score(you: &RoundOutcome, opponent: &Shape) -> usize {
+    you.shape_outcome(opponent).value() + you.value()
 }
 
 fn run(input: &str) -> Option<usize> {
@@ -69,7 +72,7 @@ fn run(input: &str) -> Option<usize> {
 
 fn parse_round_score(input: &str) -> IResult<&str, usize> {
     map(
-        separated_pair(parse_opponent_shape, tag(" "), parse_your_shape),
+        separated_pair(parse_opponent_shape, tag(" "), parse_your_outcome),
         |(opponent, you)| round_score(&you, &opponent),
     )(input)
 }
@@ -82,11 +85,11 @@ fn parse_opponent_shape(input: &str) -> IResult<&str, Shape> {
     ))(input)
 }
 
-fn parse_your_shape(input: &str) -> IResult<&str, Shape> {
+fn parse_your_outcome(input: &str) -> IResult<&str, RoundOutcome> {
     alt((
-        value(Shape::Rock, tag("X")),
-        value(Shape::Paper, tag("Y")),
-        value(Shape::Scissors, tag("Z")),
+        value(RoundOutcome::Loss, tag("X")),
+        value(RoundOutcome::Draw, tag("Y")),
+        value(RoundOutcome::Win, tag("Z")),
     ))(input)
 }
 
@@ -98,6 +101,6 @@ A Y
 B X
 C Z
         "#;
-        assert_eq!(super::run(input), Some(15))
+        assert_eq!(super::run(input), Some(12))
     }
 }
