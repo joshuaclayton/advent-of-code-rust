@@ -18,8 +18,15 @@ fn run(input: &str) -> Option<usize> {
     let (_, rucksacks) =
         all_consuming(separated_list1(tag("\n"), parse_rucksack))(input.trim()).ok()?;
     rucksacks
-        .iter()
-        .map(|rucksack| priority(rucksack.overlap()))
+        .chunks(3)
+        .into_iter()
+        .map(|grouping| {
+            priority(Rucksack::overlap(
+                grouping.get(0).unwrap(),
+                grouping.get(1).unwrap(),
+                grouping.get(2).unwrap(),
+            ))
+        })
         .sum::<usize>()
         .into()
 }
@@ -27,16 +34,23 @@ fn run(input: &str) -> Option<usize> {
 struct Rucksack(Vec<char>, Vec<char>);
 
 impl Rucksack {
-    fn overlap(&self) -> char {
-        let left: HashSet<char> = HashSet::from_iter(self.0.clone());
-        let right = HashSet::from_iter(self.1.clone());
-
-        *left
-            .intersection(&right)
-            .map(|v| *v)
+    fn overlap(first: &Self, second: &Self, third: &Self) -> char {
+        *[second, third]
+            .iter()
+            .map(|rucksack| HashSet::from_iter(rucksack.item_types()))
+            .fold(HashSet::from_iter(first.item_types()), |acc, set| {
+                acc.intersection(&set).cloned().collect::<HashSet<_>>()
+            })
+            .drain()
             .collect::<Vec<char>>()
             .get(0)
             .unwrap()
+    }
+
+    fn item_types(&self) -> Vec<char> {
+        let mut item_types = self.0.clone();
+        item_types.extend(&self.1);
+        item_types
     }
 }
 
@@ -77,7 +91,7 @@ wMqvLMZHhHMvwLHjbvcjnnSBnvTQFn
 ttgJtRGJQctTZtZT
 CrZsJsPPZsGzwwsLwLmpwMDw
         "#;
-        assert_eq!(super::run(input), Some(157))
+        assert_eq!(super::run(input), Some(70))
     }
 
     #[test]
