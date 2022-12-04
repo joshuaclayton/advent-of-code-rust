@@ -11,8 +11,8 @@ use std::ops::Range;
 #[derive(Debug)]
 struct Elf(Range<usize>);
 
-fn fully_contained(left: &Elf, right: &Elf) -> bool {
-    left.0.contains(&right.0.start) && left.0.contains(&(right.0.end - 1))
+fn partially_contained(left: &Elf, right: &Elf) -> bool {
+    left.0.contains(&right.0.start) || left.0.contains(&(right.0.end - 1))
 }
 
 pub fn solve() {
@@ -23,7 +23,9 @@ pub fn solve() {
 fn run(input: &str) -> Option<usize> {
     let (_, mut elf_pairs) =
         all_consuming(separated_list1(tag("\n"), parse_elf_pair))(input.trim()).ok()?;
-    elf_pairs.retain(|(left, right)| fully_contained(left, right) || fully_contained(right, left));
+    elf_pairs.retain(|(left, right)| {
+        partially_contained(left, right) || partially_contained(right, left)
+    });
     elf_pairs.len().into()
 }
 
@@ -55,6 +57,6 @@ mod tests {
 6-6,4-6
 2-6,4-8
         "#;
-        assert_eq!(super::run(input), Some(2))
+        assert_eq!(super::run(input), Some(4))
     }
 }
