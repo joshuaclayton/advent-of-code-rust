@@ -20,20 +20,20 @@ pub fn solve() {
 #[derive(Debug)]
 struct Crates<'a>(HashMap<usize, Vec<&'a str>>);
 
-fn times(n: usize) -> impl Iterator {
-    std::iter::repeat(()).take(n)
-}
-
 impl<'a> Crates<'a> {
     fn apply_instruction(&mut self, move_instruction: &MoveInstruction) {
-        for _ in times(move_instruction.count) {
-            let mut popped = None;
-            self.0
-                .entry(move_instruction.from)
-                .and_modify(|v| popped = Some(v.remove(0)));
+        let mut moved: Vec<&str> = vec![];
+        self.0.entry(move_instruction.from).and_modify(|v| {
+            let (initial, rest) = v.split_at(move_instruction.count);
+            moved = initial.to_vec();
+
+            *v = rest.to_vec();
+        });
+
+        for mov in moved.iter().rev() {
             self.0
                 .entry(move_instruction.to)
-                .and_modify(|v| v.insert(0, popped.unwrap()));
+                .and_modify(|v| v.insert(0, mov));
         }
     }
 
@@ -141,7 +141,7 @@ move 3 from 1 to 3
 move 2 from 2 to 1
 move 1 from 1 to 2
         "#;
-        assert_eq!(super::run(input), Some("CMZ".to_string()))
+        assert_eq!(super::run(input), Some("MCD".to_string()))
     }
 
     #[test]
