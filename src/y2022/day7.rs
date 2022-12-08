@@ -39,6 +39,7 @@ fn run(input: &str) -> Option<usize> {
 
     let graph = build_fs(lines);
     let mut scorer: Box<dyn EntryTreeVisitor> = Box::new(Scorer::default());
+    scorer.visit_root(size(&graph.root_id().unwrap(), &graph));
 
     visit_node(&graph.root_id().unwrap(), &graph, &mut scorer);
 
@@ -46,31 +47,40 @@ fn run(input: &str) -> Option<usize> {
 }
 
 trait EntryTreeVisitor {
+    fn visit_root(&mut self, size: usize);
     fn visit_file(&mut self, size: usize);
     fn visit_directory(&mut self, size: usize);
     fn score(&self) -> usize;
 }
 
 struct Scorer {
-    score: usize,
+    qualifying_scores: Vec<usize>,
+    unused_space: usize,
 }
 
 impl Default for Scorer {
     fn default() -> Self {
-        Self { score: 0 }
+        Self {
+            qualifying_scores: vec![],
+            unused_space: 70000000,
+        }
     }
 }
 
 impl EntryTreeVisitor for Scorer {
+    fn visit_root(&mut self, size: usize) {
+        self.unused_space -= size;
+    }
+
     fn visit_file(&mut self, _: usize) {}
     fn visit_directory(&mut self, size: usize) {
-        if size <= 100000 {
-            self.score += size
+        if size >= 30000000 - self.unused_space {
+            self.qualifying_scores.push(size);
         }
     }
 
     fn score(&self) -> usize {
-        self.score
+        *self.qualifying_scores.iter().min().unwrap()
     }
 }
 
@@ -182,6 +192,6 @@ $ ls
 5626152 d.ext
 7214296 k
         "#;
-        assert_eq!(super::run(input.trim()), Some(95437))
+        assert_eq!(super::run(input.trim()), Some(24933642))
     }
 }
