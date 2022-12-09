@@ -16,6 +16,37 @@ pub fn solve() {
 
 trait Moveable {
     fn move_in_direction(&mut self, direction: &Direction);
+    fn follow(&mut self, knot: &impl Positioned);
+}
+
+trait Positioned {
+    fn position(&self) -> Position;
+
+    fn adjacent_to_knot(&self, knot: &impl Positioned) -> bool {
+        (knot.position().0 - self.position().0).abs() < 2
+            && (knot.position().1 - self.position().1).abs() < 2
+    }
+
+    fn direction_to_move(&self, knot: &impl Positioned) -> Option<Direction> {
+        if !self.adjacent_to_knot(knot) {
+            match (
+                knot.position().0.cmp(&self.position().0),
+                knot.position().1.cmp(&self.position().1),
+            ) {
+                (Ordering::Equal, Ordering::Greater) => Some(Direction::North),
+                (Ordering::Equal, Ordering::Less) => Some(Direction::South),
+                (Ordering::Greater, Ordering::Equal) => Some(Direction::East),
+                (Ordering::Less, Ordering::Equal) => Some(Direction::West),
+                (Ordering::Greater, Ordering::Greater) => Some(Direction::NorthEast),
+                (Ordering::Greater, Ordering::Less) => Some(Direction::SouthEast),
+                (Ordering::Less, Ordering::Greater) => Some(Direction::NorthWest),
+                (Ordering::Less, Ordering::Less) => Some(Direction::SouthWest),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
@@ -48,26 +79,84 @@ impl Position {
     }
 }
 
-struct Head(Position);
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Knot(Position);
+
+#[derive(Debug, Default)]
+struct Rope {
+    body: [Knot; 9],
+    tail: Tail,
+}
+
+impl Positioned for Knot {
+    fn position(&self) -> Position {
+        self.0
+    }
+}
+
+impl Positioned for Tail {
+    fn position(&self) -> Position {
+        self.position
+    }
+}
 
 impl Moveable for Tail {
     fn move_in_direction(&mut self, direction: &Direction) {
         self.position.move_in_direction(direction)
     }
+
+    fn follow(&mut self, knot: &impl Positioned) {
+        if let Some(direction) = self.direction_to_move(knot) {
+            self.move_in_direction(&direction);
+            self.visited.push(self.position);
+        }
+    }
 }
 
-impl Moveable for Head {
+impl Moveable for Knot {
     fn move_in_direction(&mut self, direction: &Direction) {
         self.0.move_in_direction(direction)
     }
-}
 
-impl Default for Head {
-    fn default() -> Self {
-        Head(Position(0, 0))
+    fn follow(&mut self, knot: &impl Positioned) {
+        if let Some(direction) = self.direction_to_move(knot) {
+            self.move_in_direction(&direction);
+        }
     }
 }
 
+impl Moveable for Rope {
+    fn move_in_direction(&mut self, direction: &Direction) {
+        let mut prev: Option<Knot> = None;
+
+        for knot in self.body.iter_mut() {
+            match prev {
+                None => {
+                    knot.move_in_direction(direction);
+                    prev = Some(*knot);
+                }
+                Some(previous) => {
+                    knot.follow(&previous);
+                    prev = Some(*knot);
+                }
+            }
+        }
+
+        if let Some(previous) = prev {
+            self.tail.follow(&previous);
+        }
+    }
+
+    fn follow(&mut self, _: &impl Positioned) {}
+}
+
+impl Default for Knot {
+    fn default() -> Self {
+        Knot(Position(0, 0))
+    }
+}
+
+#[derive(Debug)]
 struct Tail {
     position: Position,
     visited: Vec<Position>,
@@ -94,56 +183,21 @@ enum Direction {
     NorthWest,
 }
 
-impl Tail {
-    fn follow(&mut self, head: &Head) {
-        if let Some(direction) = self.direction_to_move(head) {
-            self.move_in_direction(&direction);
-            self.visited.push(self.position);
-        }
-    }
-
-    fn adjacent_to_head(&self, head: &Head) -> bool {
-        (head.0 .0 - self.position.0).abs() < 2 && (head.0 .1 - self.position.1).abs() < 2
-    }
-
-    fn direction_to_move(&self, head: &Head) -> Option<Direction> {
-        if !self.adjacent_to_head(head) {
-            match (
-                head.0 .0.cmp(&self.position.0),
-                head.0 .1.cmp(&self.position.1),
-            ) {
-                (Ordering::Equal, Ordering::Greater) => Some(Direction::North),
-                (Ordering::Equal, Ordering::Less) => Some(Direction::South),
-                (Ordering::Greater, Ordering::Equal) => Some(Direction::East),
-                (Ordering::Less, Ordering::Equal) => Some(Direction::West),
-                (Ordering::Greater, Ordering::Greater) => Some(Direction::NorthEast),
-                (Ordering::Greater, Ordering::Less) => Some(Direction::SouthEast),
-                (Ordering::Less, Ordering::Greater) => Some(Direction::NorthWest),
-                (Ordering::Less, Ordering::Less) => Some(Direction::SouthWest),
-                _ => None,
-            }
-        } else {
-            None
-        }
-    }
-}
-
 fn run(input: &str) -> Option<usize> {
     let (_, instructions) =
         all_consuming(separated_list1(tag("\n"), parse_instruction))(input.trim()).ok()?;
 
-    let mut head = Head::default();
-    let mut tail = Tail::default();
+    let mut rope = Rope::default();
 
     for instruction in &instructions {
         for _ in times(instruction.1) {
-            head.move_in_direction(&instruction.0);
-            tail.follow(&head);
+            rope.move_in_direction(&instruction.0);
         }
     }
 
     Some(
-        tail.visited
+        rope.tail
+            .visited
             .into_iter()
             .collect::<HashSet<Position>>()
             .len(),
@@ -188,7 +242,22 @@ D 1
 L 5
 R 2
         "#;
-        assert_eq!(run(input), Some(13))
+        assert_eq!(run(input), Some(1))
+    }
+
+    #[test]
+    fn solve_returns_the_correct_value_bigger() {
+        let input = r#"
+R 5
+U 8
+L 8
+D 3
+R 17
+D 10
+L 25
+U 20
+            "#;
+        assert_eq!(run(input), Some(36))
     }
 
     #[test]
@@ -197,25 +266,25 @@ R 2
             position: Position(0, 0),
             visited: vec![]
         }
-        .adjacent_to_head(&Head::default()));
+        .adjacent_to_knot(&Knot::default()));
 
         assert!(Tail {
             position: Position(1, 0),
             visited: vec![]
         }
-        .adjacent_to_head(&Head::default()));
+        .adjacent_to_knot(&Knot::default()));
 
         assert!(Tail {
             position: Position(-1, -1),
             visited: vec![]
         }
-        .adjacent_to_head(&Head::default()));
+        .adjacent_to_knot(&Knot::default()));
 
         assert!(!Tail {
             position: Position(2, 0),
             visited: vec![]
         }
-        .adjacent_to_head(&Head::default()));
+        .adjacent_to_knot(&Knot::default()));
     }
 
     #[test]
@@ -225,19 +294,19 @@ R 2
             visited: vec![],
         };
 
-        tail.follow(&Head(Position(-3, 0)));
+        tail.follow(&Knot(Position(-3, 0)));
         assert_eq!(tail.position, Position(-1, 0));
 
-        tail.follow(&Head(Position(-3, 0)));
+        tail.follow(&Knot(Position(-3, 0)));
         assert_eq!(tail.position, Position(-2, 0));
 
-        tail.follow(&Head(Position(-3, 0)));
+        tail.follow(&Knot(Position(-3, 0)));
         assert_eq!(tail.position, Position(-2, 0));
 
-        tail.follow(&Head(Position(-3, 1)));
+        tail.follow(&Knot(Position(-3, 1)));
         assert_eq!(tail.position, Position(-2, 0));
 
-        tail.follow(&Head(Position(-3, 2)));
+        tail.follow(&Knot(Position(-3, 2)));
         assert_eq!(tail.position, Position(-3, 1));
     }
 
@@ -249,17 +318,17 @@ R 2
         };
 
         assert_eq!(
-            tail.direction_to_move(&Head(Position(-3, 0))).unwrap(),
+            tail.direction_to_move(&Knot(Position(-3, 0))).unwrap(),
             Direction::West
         );
 
         assert_eq!(
-            tail.direction_to_move(&Head(Position(0, 2))).unwrap(),
+            tail.direction_to_move(&Knot(Position(0, 2))).unwrap(),
             Direction::North
         );
 
         assert_eq!(
-            tail.direction_to_move(&Head(Position(-3, 2))).unwrap(),
+            tail.direction_to_move(&Knot(Position(-3, 2))).unwrap(),
             Direction::NorthWest
         );
     }
