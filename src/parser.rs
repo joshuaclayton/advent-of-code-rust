@@ -1,13 +1,25 @@
 use nom::{
+    bytes::complete::tag,
     bytes::complete::take_till,
     character::complete::{digit1, satisfy},
     character::is_alphabetic,
-    combinator::{map_res, recognize},
+    combinator::{map_res, opt, recognize},
+    sequence::pair,
     IResult,
 };
 
 pub fn parse_usize(input: &str) -> IResult<&str, usize> {
     map_res(recognize(digit1), str::parse)(input)
+}
+
+fn parse_signed_digits(input: &str) -> IResult<&str, (Option<&str>, &str)> {
+    pair(opt(tag("-")), recognize(digit1))(input)
+}
+
+pub fn parse_digits<T: std::str::FromStr>(input: &str) -> IResult<&str, T> {
+    map_res(parse_signed_digits, |(sign, value)| {
+        str::parse(&format!("{}{}", sign.unwrap_or(""), value))
+    })(input)
 }
 
 pub fn parse_usize_in_range(
