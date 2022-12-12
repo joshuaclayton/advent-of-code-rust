@@ -32,14 +32,16 @@ fn run(input: &str) -> Option<usize> {
         monkeys.insert(monkey.id, monkey);
     }
 
-    for _ in times(20) {
+    let base: usize = monkeys.values().map(|m| m.test.divisible_by).product();
+
+    for _ in times(10000) {
         for id in &keys {
             let mut throw_at: Vec<(usize, Item)> = vec![];
             let monkey = monkeys.get_mut(&id).unwrap();
 
             for item in monkey.items.drain(0..) {
                 monkey.inspection_count += 1;
-                let new_item = Item(monkey.operation.run(item.0) / 3);
+                let new_item = Item(monkey.operation.run(item.0) % base);
 
                 throw_at.push(monkey.test.throw(new_item));
             }
@@ -230,6 +232,6 @@ Monkey 3:
     If true: throw to monkey 0
     If false: throw to monkey 1
 "#;
-        assert_eq!(super::run(input), Some(10605))
+        assert_eq!(super::run(input), Some(2713310158))
     }
 }
