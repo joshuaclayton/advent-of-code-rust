@@ -18,14 +18,22 @@ fn run(input: &str) -> Option<isize> {
         all_consuming(separated_list1(tag("\n"), parse_instruction))(input.trim()).ok()?;
     let cpu = Cpu::process(instructions);
 
-    Some(
-        cpu.value_at(20)
-            + cpu.value_at(60)
-            + cpu.value_at(100)
-            + cpu.value_at(140)
-            + cpu.value_at(180)
-            + cpu.value_at(220),
-    )
+    for (index, state) in cpu.cycles.iter().enumerate() {
+        let idx = (index as isize) % 40;
+        let range = (state.x - 1)..=(state.x + 1);
+
+        if idx == 0 {
+            print!("\n");
+        }
+
+        if range.contains(&idx) {
+            print!("#");
+        } else {
+            print!(".");
+        }
+    }
+
+    None
 }
 
 #[derive(PartialEq, Clone, Debug, Copy)]
@@ -46,11 +54,6 @@ struct Cpu {
 }
 
 impl Cpu {
-    fn value_at(&self, position: usize) -> isize {
-        let cycle = self.cycles.get(position - 1).unwrap();
-        cycle.cycle as isize * cycle.x
-    }
-
     fn process(instructions: Vec<Instruction>) -> Self {
         let mut cpu = Cpu { cycles: vec![] };
 
@@ -245,7 +248,6 @@ noop
 noop
 noop
         "#;
-        assert_eq!(run(input), Some(13140))
     }
 
     #[test]
