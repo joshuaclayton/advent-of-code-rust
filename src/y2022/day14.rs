@@ -19,11 +19,23 @@ fn run(input: &str) -> Option<usize> {
     let (_, all_points) =
         all_consuming(separated_list1(tag("\n"), parse_line))(input.trim()).ok()?;
 
-    for points in all_points {
+    for points in &all_points {
         for pair in points.as_slice().windows(2) {
             walls.extend(pair[0].to_position(pair[1]));
         }
     }
+
+    let maximum_y = &all_points
+        .iter()
+        .flatten()
+        .map(|position| position.1)
+        .max()
+        .unwrap()
+        + 2;
+
+    walls.extend(
+        Position(500 - maximum_y, maximum_y).to_position(Position(500 + maximum_y, maximum_y)),
+    );
 
     let mut board = Board {
         walls,
@@ -40,7 +52,7 @@ fn run(input: &str) -> Option<usize> {
         dropped_sand += 1;
     }
 
-    Some(dropped_sand - 1)
+    Some(dropped_sand)
 }
 
 fn parse_line(input: &str) -> IResult<&str, Vec<Position>> {
@@ -166,7 +178,11 @@ impl Board {
                 }
                 (Some(_), Some(_), Some(_)) => {
                     moving = false;
-                    self.sand.push(sand);
+                    if sand == Position::default() {
+                        self.running = false;
+                    } else {
+                        self.sand.push(sand);
+                    }
                 }
             }
 
@@ -194,7 +210,7 @@ mod tests {
 498,4 -> 498,6 -> 496,6
 503,4 -> 502,4 -> 502,9 -> 494,9
         "#;
-        assert_eq!(super::run(input), Some(24))
+        assert_eq!(super::run(input), Some(93))
     }
 
     #[test]
