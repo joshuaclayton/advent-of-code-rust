@@ -39,13 +39,11 @@ fn run(input: &str) -> Option<usize> {
     all_packets.push(v6.clone());
 
     all_packets.sort_by(|l, r| compare_packets(l, r));
-    dbg!(&all_packets);
 
     Some(
         (all_packets.iter().position(|v| v == &v2).unwrap() + 1)
             * (all_packets.iter().position(|v| v == &v6).unwrap() + 1),
     )
-    // Some(comparisons.iter().sum())
 }
 
 fn compare_packets<'a>(left: &'a PacketData, right: &'a PacketData) -> Ordering {
