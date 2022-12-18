@@ -14,40 +14,43 @@ pub fn solve() {
     println!("Answer: {:?}", run(input));
 }
 
-#[derive(PartialEq, Debug, Clone)]
-enum Order {
-    Continue,
-    Right,
-    Wrong,
+fn build_divider_packet_with_value(value: usize) -> PacketData {
+    PacketData::List(vec![Box::new(PacketData::List(vec![Box::new(
+        PacketData::Value(value),
+    )]))])
 }
 
 fn run(input: &str) -> Option<usize> {
     let (_, packets) = all_consuming(parse_packets)(input.trim()).ok()?;
 
-    let mut comparisons = vec![];
+    let mut all_packets = vec![];
     for (index, (l, r)) in packets.iter().enumerate() {
-        let left = PacketData::List(l.clone().into_iter().map(Box::new).collect::<Vec<_>>());
-        let right = PacketData::List(r.clone().into_iter().map(Box::new).collect::<Vec<_>>());
-
-        let comparison_result = compare_packets(&left, &right);
-
-        if comparison_result == Order::Right {
-            comparisons.push(index + 1);
-        }
+        all_packets.push(PacketData::List(
+            l.clone().into_iter().map(Box::new).collect::<Vec<_>>(),
+        ));
+        all_packets.push(PacketData::List(
+            r.clone().into_iter().map(Box::new).collect::<Vec<_>>(),
+        ));
     }
 
-    Some(comparisons.iter().sum())
+    let v2 = build_divider_packet_with_value(2);
+    let v6 = build_divider_packet_with_value(6);
+    all_packets.push(v2.clone());
+    all_packets.push(v6.clone());
+
+    all_packets.sort_by(|l, r| compare_packets(l, r));
+    dbg!(&all_packets);
+
+    Some(
+        (all_packets.iter().position(|v| v == &v2).unwrap() + 1)
+            * (all_packets.iter().position(|v| v == &v6).unwrap() + 1),
+    )
+    // Some(comparisons.iter().sum())
 }
 
-fn compare_packets<'a>(left: &'a PacketData, right: &'a PacketData) -> Order {
+fn compare_packets<'a>(left: &'a PacketData, right: &'a PacketData) -> Ordering {
     match (left, right) {
-        (PacketData::Value(left_val), PacketData::Value(right_val)) => {
-            match left_val.cmp(right_val) {
-                Ordering::Less => Order::Right,
-                Ordering::Equal => Order::Continue,
-                Ordering::Greater => Order::Wrong,
-            }
-        }
+        (PacketData::Value(left_val), PacketData::Value(right_val)) => left_val.cmp(right_val),
         (value @ PacketData::Value(_), list) => {
             compare_packets(&PacketData::List(vec![Box::new(value.clone())]), list)
         }
@@ -55,24 +58,20 @@ fn compare_packets<'a>(left: &'a PacketData, right: &'a PacketData) -> Order {
             compare_packets(list, &PacketData::List(vec![Box::new(value.clone())]))
         }
         (PacketData::List(left_list), PacketData::List(right_list)) => {
-            let mut current_order = Order::Continue;
+            let mut current_order = Ordering::Equal;
 
             for (idx, l) in left_list.iter().enumerate() {
-                if current_order == Order::Continue {
+                if current_order == Ordering::Equal {
                     if let Some(r) = right_list.get(idx) {
                         current_order = compare_packets(l, r);
                     } else {
-                        current_order = Order::Wrong;
+                        current_order = Ordering::Greater;
                     }
                 }
             }
 
-            if current_order == Order::Continue {
-                match left_list.len().cmp(&right_list.len()) {
-                    Ordering::Less => Order::Right,
-                    Ordering::Equal => Order::Continue,
-                    Ordering::Greater => Order::Wrong,
-                }
+            if current_order == Ordering::Equal {
+                left_list.len().cmp(&right_list.len())
             } else {
                 current_order
             }
@@ -80,7 +79,7 @@ fn compare_packets<'a>(left: &'a PacketData, right: &'a PacketData) -> Order {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 enum PacketData {
     Value(usize),
     List(Vec<Box<PacketData>>),
@@ -143,15 +142,6 @@ mod tests {
 [1,[2,[3,[4,[5,6,7]]]],8,9]
 [1,[2,[3,[4,[5,6,0]]]],8,9]
         "#;
-        assert_eq!(run(input), Some(13))
-    }
-
-    #[test]
-    fn solve_still_returns_the_correct_value() {
-        let input = r#"
-[[],[[1],2],[]]
-[[],[[1],[2]],[[]]]
-        "#;
-        assert_eq!(run(input), Some(1))
+        assert_eq!(run(input), Some(140))
     }
 }
