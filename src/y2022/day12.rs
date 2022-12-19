@@ -24,11 +24,11 @@ impl Position {
         let mut results = vec![];
 
         if self.height() - other.height() > 1 {
-            results.push((self.index(), other.index()));
+            results.push((other.index(), self.index()));
         }
 
         if other.height() - self.height() > 1 {
-            results.push((other.index(), self.index()));
+            results.push((self.index(), other.index()));
         }
 
         if (self.height() - other.height()).abs() <= 1 {
@@ -125,7 +125,6 @@ fn run(input: &str) -> Option<usize> {
     let mut previous_row = vec![];
     let mut result = BTreeMap::new();
     let mut edges: Vec<(PositionIdx, PositionIdx)> = vec![];
-    let mut starting = None;
     let mut ending = None;
     let mut grid = vec![];
 
@@ -135,9 +134,6 @@ fn run(input: &str) -> Option<usize> {
         for (col_idx, col) in row.iter().enumerate() {
             let position = Position::from_char(PositionIdx(idx), *col, Point(row_idx, col_idx));
             current_row.push(position);
-            if position.starting() {
-                starting = Some(position);
-            }
 
             if position.ending() {
                 ending = Some(position);
@@ -159,7 +155,7 @@ fn run(input: &str) -> Option<usize> {
         .collect::<Vec<_>>();
 
     let g = Graph::<i32, ()>::from_edges(&e);
-    let node_map = dijkstra(&g, NodeIndex::new(starting.unwrap().index().0), None, |_| 1);
+    let node_map = dijkstra(&g, NodeIndex::new(ending.unwrap().index().0), None, |_| 1);
 
     let mut results = node_map
         .iter()
@@ -171,10 +167,10 @@ fn run(input: &str) -> Option<usize> {
 
     results.sort_by_key(|x| (x.0, x.1));
 
-    let highest = results.iter().map(|v| v.0).max();
+    let lowest = results.iter().map(|v| v.0).min();
     let binding = results
         .iter()
-        .filter(|r| r.0 == highest.unwrap())
+        .filter(|r| r.0 == lowest.unwrap())
         .collect::<Vec<_>>();
 
     for row in grid {
@@ -193,8 +189,7 @@ fn run(input: &str) -> Option<usize> {
     }
 
     node_map
-        .get(&NodeIndex::new(ending.unwrap().index().0))
-        .or(node_map.get(&NodeIndex::new(binding[0].2.index().0)))
+        .get(&NodeIndex::new(binding[0].2.index().0))
         .copied()
 }
 
@@ -210,7 +205,7 @@ accszExk
 acctuvwj
 abdefghi
 "#;
-        assert_eq!(run(input), Some(31))
+        assert_eq!(run(input), Some(29))
     }
 
     #[test]
@@ -229,31 +224,5 @@ abdefghi
             Position::from_char(PositionIdx(0), 'S', Point(0, 0)).height(),
             0
         );
-    }
-
-    #[test]
-    fn test_edges_to() {
-        let pos1 = Position::from_char(PositionIdx(0), 'a', Point(0, 0));
-        let pos2 = Position::from_char(PositionIdx(1), 'b', Point(0, 1));
-        let pos3 = Position::from_char(PositionIdx(2), 'c', Point(1, 0));
-
-        assert_eq!(
-            pos1.edges_to(&pos2),
-            vec![
-                (PositionIdx(1), PositionIdx(0)),
-                (PositionIdx(0), PositionIdx(1)),
-            ]
-        );
-
-        assert_eq!(
-            pos2.edges_to(&pos1),
-            vec![
-                (PositionIdx(0), PositionIdx(1)),
-                (PositionIdx(1), PositionIdx(0)),
-            ]
-        );
-
-        assert_eq!(pos1.edges_to(&pos3), vec![(PositionIdx(2), PositionIdx(0))]);
-        assert_eq!(pos3.edges_to(&pos1), vec![(PositionIdx(2), PositionIdx(0))]);
     }
 }
