@@ -1,6 +1,6 @@
 use colored::Colorize;
 use petgraph::algo::dijkstra;
-use petgraph::graph::{NodeIndex, UnGraph};
+use petgraph::graph::{Graph, NodeIndex};
 use std::collections::BTreeMap;
 
 pub fn solve() {
@@ -16,8 +16,27 @@ impl Position {
         match input {
             'S' => Position::Starting(idx, point),
             'E' => Position::Ending(idx, point),
-            v => Position::Point(idx, point, input),
+            v => Position::Point(idx, point, v),
         }
+    }
+
+    fn edges_to(&self, other: &Position) -> Vec<(PositionIdx, PositionIdx)> {
+        let mut results = vec![];
+
+        if self.height() - other.height() > 1 {
+            results.push((self.index(), other.index()));
+        }
+
+        if other.height() - self.height() > 1 {
+            results.push((other.index(), self.index()));
+        }
+
+        if (self.height() - other.height()).abs() <= 1 {
+            results.push((other.index(), self.index()));
+            results.push((self.index(), other.index()));
+        }
+
+        results
     }
 
     fn to_char(&self) -> char {
@@ -29,7 +48,7 @@ impl Position {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct PositionIdx(usize);
 
 #[derive(Clone, Copy, Debug)]
@@ -75,9 +94,7 @@ fn horizontal_edges(positions: Vec<Position>) -> Vec<(PositionIdx, PositionIdx)>
     let mut results = vec![];
 
     for pair in positions.as_slice().windows(2) {
-        if (pair[0].height() - pair[1].height()).abs() <= 1 {
-            results.push((pair[0].index(), pair[1].index()));
-        }
+        results.extend(pair[0].edges_to(&pair[1]));
     }
 
     results
@@ -91,9 +108,7 @@ fn vertical_edges(top: Vec<Position>, bottom: Vec<Position>) -> Vec<(PositionIdx
     let mut results = vec![];
 
     for (idx, position) in bottom.iter().enumerate() {
-        if (position.height() - top[idx].height()).abs() <= 1 {
-            results.push((position.index(), top[idx].index()));
-        }
+        results.extend(position.edges_to(&top[idx]));
     }
 
     results
@@ -143,7 +158,7 @@ fn run(input: &str) -> Option<usize> {
         .map(|e| (NodeIndex::new(e.0 .0), NodeIndex::new(e.1 .0)))
         .collect::<Vec<_>>();
 
-    let g = UnGraph::<i32, ()>::from_edges(&e);
+    let g = Graph::<i32, ()>::from_edges(&e);
     let node_map = dijkstra(&g, NodeIndex::new(starting.unwrap().index().0), None, |_| 1);
 
     let mut results = node_map
@@ -161,12 +176,15 @@ fn run(input: &str) -> Option<usize> {
         .iter()
         .filter(|r| r.0 == highest.unwrap())
         .collect::<Vec<_>>();
-    // dbg!(&results);
 
     for row in grid {
         for position in row {
             if node_map.contains_key(&NodeIndex::new(position.index().0)) {
-                print!("{}", format!("{}", position.to_char()).green());
+                if binding[0].2.index().0 == position.index().0 {
+                    print!("{}", format!("{}", position.to_char()).yellow());
+                } else {
+                    print!("{}", format!("{}", position.to_char()).green());
+                }
             } else {
                 print!("{}", format!("{}", position.to_char()).red());
             }
@@ -211,5 +229,31 @@ abdefghi
             Position::from_char(PositionIdx(0), 'S', Point(0, 0)).height(),
             0
         );
+    }
+
+    #[test]
+    fn test_edges_to() {
+        let pos1 = Position::from_char(PositionIdx(0), 'a', Point(0, 0));
+        let pos2 = Position::from_char(PositionIdx(1), 'b', Point(0, 1));
+        let pos3 = Position::from_char(PositionIdx(2), 'c', Point(1, 0));
+
+        assert_eq!(
+            pos1.edges_to(&pos2),
+            vec![
+                (PositionIdx(1), PositionIdx(0)),
+                (PositionIdx(0), PositionIdx(1)),
+            ]
+        );
+
+        assert_eq!(
+            pos2.edges_to(&pos1),
+            vec![
+                (PositionIdx(0), PositionIdx(1)),
+                (PositionIdx(1), PositionIdx(0)),
+            ]
+        );
+
+        assert_eq!(pos1.edges_to(&pos3), vec![(PositionIdx(2), PositionIdx(0))]);
+        assert_eq!(pos3.edges_to(&pos1), vec![(PositionIdx(2), PositionIdx(0))]);
     }
 }
