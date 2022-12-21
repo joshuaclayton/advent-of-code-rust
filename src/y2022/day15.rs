@@ -10,7 +10,9 @@ use std::{collections::HashSet, ops::Range};
 
 pub fn solve() {
     let input = include_str!("input-day15");
-    println!("Answer: {:?}", run(input, 2000000));
+    for n in 0..4000000 {
+        run(input, n);
+    }
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -46,39 +48,137 @@ impl Locatable for Sensor {
 }
 
 impl Sensor {
-    fn manhattan_distances_unavailable(&self, y: isize) -> HashSet<Point> {
+    fn manhattan_distances_unavailable(&self, y: isize) -> Option<Range<isize>> {
         let y_offset = (self.point.1 - y).abs();
         let width = self.manhattan_distance_to(&self.closest_beacon) as isize - y_offset;
 
-        let mut results = HashSet::new();
+        if width < 0 {
+            None
+        } else {
+            Some(Range {
+                start: width * -1 + self.point.0,
+                end: width + 1 + self.point.0,
+            })
+        }
+    }
+}
 
-        for width_offset in (Range {
-            start: width * -1,
-            end: width + 1,
-        }) {
-            results.insert(Point(self.point.0 + width_offset, y));
+#[derive(Clone, Debug, Default)]
+struct Ranges(Vec<Range<isize>>);
+
+impl Ranges {
+    fn width(&self) -> usize {
+        self.0.iter().map(|r| range_width(r)).sum()
+    }
+
+    fn contains(&self, value: isize) -> bool {
+        self.0.iter().any(|r| r.contains(&value))
+    }
+
+    fn add_range(&mut self, range: &Range<isize>) {
+        let mut push = false;
+
+        for range_mut in self.0.iter_mut() {
+            if flatten_range(range_mut, range) {
+                push = true
+            }
         }
 
-        results
+        if push || self.0.is_empty() {
+            self.0.push(range.clone());
+        }
+    }
+
+    fn flatten(&mut self) {
+        let start = self.0.len();
+        let mut res = Ranges::default();
+
+        for r in sort_ranges(self.0.clone()) {
+            res.add_range(&r);
+        }
+
+        if res.0.len() < start {
+            *self = res;
+        }
+    }
+}
+
+fn sort_ranges<T: Copy + std::ops::Sub<Output = isize>>(ranges: Vec<Range<T>>) -> Vec<Range<T>> {
+    let mut new_ranges = ranges.clone();
+
+    new_ranges.sort_by_key(|r| range_width(r));
+    new_ranges.reverse();
+
+    new_ranges
+}
+
+fn range_width<T: Copy + std::ops::Sub<Output = isize>>(range: &Range<T>) -> usize {
+    (range.end - range.start) as usize
+}
+
+fn flatten_range(left: &mut Range<isize>, right: &Range<isize>) -> bool {
+    let mut contained = false;
+    let mut push = false;
+
+    match (left.contains(&right.start), left.contains(&right.end)) {
+        (true, true) => contained = true,
+        (true, false) => {
+            left.end = right.end;
+        }
+        (false, true) => {
+            left.start = right.start;
+        }
+        (false, false) => push = true,
+    }
+
+    if left.end + 1 == right.start {
+        left.end = right.end;
+    }
+
+    if right.end + 1 == left.start {
+        left.start = right.start;
+    }
+
+    if contained {
+        false
+    } else {
+        if push {
+            true
+        } else {
+            false
+        }
     }
 }
 
 fn run(input: &str, row: isize) -> Option<usize> {
     let (_, sensors) =
         all_consuming(separated_list1(tag("\n"), parse_sensor))(input.trim()).ok()?;
-    let points = sensors.iter().fold(HashSet::new(), |acc, s| {
-        s.manhattan_distances_unavailable(row)
-            .union(&acc)
-            .cloned()
-            .collect()
-    });
+    let mut ranges = vec![];
+    for sensor in &sensors {
+        if let Some(range) = sensor.manhattan_distances_unavailable(row) {
+            ranges.push(range);
+        }
+    }
 
-    let taken_points = sensors
+    ranges = sort_ranges(ranges);
+    let mut r = Ranges::default();
+
+    for range in ranges {
+        r.add_range(&range);
+    }
+
+    r.flatten();
+    r.flatten();
+
+    let taken_xs = sensors
         .iter()
         .flat_map(|s| vec![s.point, s.closest_beacon.0])
-        .collect::<HashSet<Point>>();
+        .filter_map(|point| if point.1 == row { Some(point.0) } else { None })
+        .filter(|x| r.contains(*x))
+        .collect::<HashSet<_>>()
+        .len();
 
-    Some(points.difference(&taken_points).count())
+    Some(r.width() - taken_xs)
 }
 
 fn parse_sensor(input: &str) -> IResult<&str, Sensor> {
