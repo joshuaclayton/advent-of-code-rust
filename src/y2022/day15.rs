@@ -6,7 +6,7 @@ use nom::{
     sequence::{preceded, terminated},
     IResult,
 };
-use std::{collections::HashSet, ops::Range};
+use std::ops::Range;
 
 pub fn solve() {
     let input = include_str!("input-day15");
@@ -67,53 +67,37 @@ impl Sensor {
 struct Ranges(Vec<Range<isize>>);
 
 impl Ranges {
-    fn width(&self) -> usize {
-        self.0.iter().map(|r| range_width(r)).sum()
-    }
-
-    fn contains(&self, value: isize) -> bool {
-        self.0.iter().any(|r| r.contains(&value))
-    }
-
-    fn add_range(&mut self, range: &Range<isize>) {
+    fn add_range(&mut self, range: Range<isize>) {
         let mut push = false;
 
         for range_mut in self.0.iter_mut() {
-            if flatten_range(range_mut, range) {
+            if flatten_range(range_mut, &range) {
                 push = true
             }
         }
 
         if push || self.0.is_empty() {
-            self.0.push(range.clone());
+            self.0.push(range);
         }
     }
 
     fn flatten(&mut self) {
-        let start = self.0.len();
         let mut res = Ranges::default();
 
         for r in sort_ranges(self.0.clone()) {
-            res.add_range(&r);
+            res.add_range(r);
         }
 
-        if res.0.len() < start {
-            *self = res;
-        }
+        *self = res;
     }
 }
 
-fn sort_ranges<T: Copy + std::ops::Sub<Output = isize>>(ranges: Vec<Range<T>>) -> Vec<Range<T>> {
+fn sort_ranges(ranges: Vec<Range<isize>>) -> Vec<Range<isize>> {
     let mut new_ranges = ranges.clone();
 
-    new_ranges.sort_by_key(|r| range_width(r));
-    new_ranges.reverse();
+    new_ranges.sort_by_key(|r| r.start);
 
     new_ranges
-}
-
-fn range_width<T: Copy + std::ops::Sub<Output = isize>>(range: &Range<T>) -> usize {
-    (range.end - range.start) as usize
 }
 
 fn flatten_range(left: &mut Range<isize>, right: &Range<isize>) -> bool {
@@ -128,15 +112,14 @@ fn flatten_range(left: &mut Range<isize>, right: &Range<isize>) -> bool {
         (false, true) => {
             left.start = right.start;
         }
-        (false, false) => push = true,
-    }
-
-    if left.end + 1 == right.start {
-        left.end = right.end;
-    }
-
-    if right.end + 1 == left.start {
-        left.start = right.start;
+        (false, false) => {
+            if right.contains(&left.start) && right.contains(&left.end) {
+                left.start = right.start;
+                left.end = right.end;
+            } else {
+                push = true;
+            }
+        }
     }
 
     if contained {
@@ -160,25 +143,19 @@ fn run(input: &str, row: isize) -> Option<usize> {
         }
     }
 
-    ranges = sort_ranges(ranges);
     let mut r = Ranges::default();
 
-    for range in ranges {
-        r.add_range(&range);
+    for range in sort_ranges(ranges) {
+        r.add_range(range);
     }
 
     r.flatten();
-    r.flatten();
 
-    let taken_xs = sensors
-        .iter()
-        .flat_map(|s| vec![s.point, s.closest_beacon.0])
-        .filter_map(|point| if point.1 == row { Some(point.0) } else { None })
-        .filter(|x| r.contains(*x))
-        .collect::<HashSet<_>>()
-        .len();
+    if r.0.len() > 1 {
+        println!("{:?} {}", r, row);
+    }
 
-    Some(r.width() - taken_xs)
+    None
 }
 
 fn parse_sensor(input: &str) -> IResult<&str, Sensor> {
@@ -202,6 +179,8 @@ fn parse_point(input: &str) -> IResult<&str, Point> {
 }
 
 mod tests {
+    use super::*;
+
     #[test]
     fn solve_returns_the_correct_value() {
         let input = r#"
@@ -221,5 +200,26 @@ Sensor at x=14, y=3: closest beacon is at x=15, y=3
 Sensor at x=20, y=1: closest beacon is at x=15, y=3
 "#;
         assert_eq!(super::run(input, 10), Some(26))
+    }
+
+    #[test]
+    fn test_adding_ranges() {
+        let mut ranges = Ranges::default();
+
+        ranges.add_range(Range { start: -5, end: 5 });
+        ranges.add_range(Range { start: -3, end: 2 });
+        ranges.add_range(Range {
+            start: -10,
+            end: 10,
+        });
+        ranges.add_range(Range { start: 2, end: 19 });
+
+        assert_eq!(
+            ranges.0,
+            vec![Range {
+                start: -10,
+                end: 19
+            },]
+        );
     }
 }
