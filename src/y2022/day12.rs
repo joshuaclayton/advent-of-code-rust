@@ -173,21 +173,6 @@ fn run(input: &str) -> Option<usize> {
         .filter(|r| r.0 == lowest.unwrap())
         .collect::<Vec<_>>();
 
-    for row in grid {
-        for position in row {
-            if node_map.contains_key(&NodeIndex::new(position.index().0)) {
-                if binding[0].2.index().0 == position.index().0 {
-                    print!("{}", format!("{}", position.to_char()).yellow());
-                } else {
-                    print!("{}", format!("{}", position.to_char()).green());
-                }
-            } else {
-                print!("{}", format!("{}", position.to_char()).red());
-            }
-        }
-        print!("\n");
-    }
-
     node_map
         .get(&NodeIndex::new(binding[0].2.index().0))
         .copied()
