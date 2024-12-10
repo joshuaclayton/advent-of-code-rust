@@ -1,3 +1,6 @@
-use advent_of_code::*;
-
-fn main() {}
+fn main() {
+    match y2024::day1::run() {
+        Ok(_) => println!("Success"),
+        Err(e) => println!("failed: {}", e),
+    }
+}

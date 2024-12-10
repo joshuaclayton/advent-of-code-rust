@@ -1,3 +1,4 @@
 /target
 src/*/input-*
 previous/*/input-*
+crates/*/*/input-*

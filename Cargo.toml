@@ -8,5 +8,7 @@ edition = "2021"
 
 [dependencies]
 nom = "^7.1"
-itertools = "^0.13"
-num-bigint = "^0.4"
+y2024 = { path = "crates/y2024" }
+
+[workspace]
+members = ["crates/parser", "crates/y2024"]
