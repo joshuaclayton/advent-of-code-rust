@@ -30,25 +30,41 @@ struct Report(Vec<Level>);
 
 impl Report {
     fn is_safe(&self) -> bool {
-        (self.differences().iter().all(|&diff| diff < 0)
-            || self.differences().iter().all(|&diff| diff > 0))
-            && self
-                .differences()
-                .iter()
-                .all(|&diff| (1..=3).contains(&diff.abs()))
-    }
+        let values: Vec<_> = self.0.iter().map(|l| l.0).collect();
 
-    fn differences(&self) -> Vec<isize> {
-        let mut differences = vec![];
-
-        for val in self.0.windows(2) {
-            differences.push((val[1].0 as isize) - (val[0].0 as isize));
-        }
-
-        differences
+        possibilities(&values)
+            .into_iter()
+            .any(|groups| is_safe(&groups))
     }
 }
 
+fn is_safe(values: &[usize]) -> bool {
+    (differences(values).iter().all(|&diff| diff < 0)
+        || differences(values).iter().all(|&diff| diff > 0))
+        && differences(values)
+            .iter()
+            .all(|&diff| (1..=3).contains(&diff.abs()))
+}
+
+fn differences(values: &[usize]) -> Vec<isize> {
+    let mut differences = vec![];
+
+    for val in values.windows(2) {
+        differences.push((val[1] as isize) - (val[0] as isize));
+    }
+
+    differences
+}
+fn possibilities(values: &[usize]) -> Vec<Vec<usize>> {
+    (0..values.len())
+        .map(|i| {
+            let mut result = vec![];
+            result.extend_from_slice(&values[..i]); // Take elements before `i`
+            result.extend_from_slice(&values[i + 1..]); // Take elements after `i`
+            result
+        })
+        .collect()
+}
 fn parse_input(input: &str) -> IResult<&str, Vec<Report>> {
     all_consuming(terminated(
         separated_list1(tag("\n"), parse_report),
@@ -69,28 +85,16 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_differences_ascending() {
-        let report = Report(vec![1.into(), 2.into(), 3.into(), 4.into(), 5.into()]);
-        assert_eq!(report.differences(), vec![1, 1, 1, 1]);
-    }
-
-    #[test]
-    fn test_differences_descending() {
-        let report = Report(vec![4.into(), 3.into(), 2.into(), 1.into(), 0.into()]);
-        assert_eq!(report.differences(), vec![-1, -1, -1, -1]);
-    }
-
-    #[test]
     fn test_differences_variable() {
-        let report = Report(vec![
-            2.into(),
-            4.into(),
-            3.into(),
-            3.into(),
-            2.into(),
-            1.into(),
-            0.into(),
-        ]);
-        assert_eq!(report.differences(), vec![2, -1, 0, -1, -1, -1]);
+        let values = vec![2, 4, 3, 3, 2, 1, 0];
+        assert_eq!(differences(&values), vec![2, -1, 0, -1, -1, -1]);
+    }
+
+    #[test]
+    fn test_possibilities() {
+        assert_eq!(
+            possibilities(&[1, 2, 3, 4]),
+            vec![vec![2, 3, 4], vec![1, 3, 4], vec![1, 2, 4], vec![1, 2, 3],]
+        );
     }
 }
